@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Floating Circles Digital Clock (5x8 Grid with Colons)</title>
+    <style>
+        body {
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background-color: #111;
+            color: white;
+            font-family: sans-serif;
+        }
+
+        canvas {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="clockCanvas"></canvas>
+
+    <script>
+        const canvas = document.getElementById("clockCanvas");
+        const ctx = canvas.getContext("2d");
+
+        // Set canvas size
+        const resizeCanvas = () => {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        };
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        const CIRCLE_RADIUS = 8;
+        const CIRCLE_SPACING = 15;
+        const TRANSITION_SPEED = 0.05;
+
+        const digitPatterns = [
+            // Each array corresponds to a 5x8 grid for each digit
+            [0, 1, 1, 1, 0, 1, 0, 0, 0, 1, 1, 0, 0, 1, 1, 1, 0, 1, 0, 1, 1, 1, 0, 0, 1, 1, 0, 0, 0, 1, 0, 1, 1, 1, 0], // 0
+            [0, 0, 1, 0, 0, 0, 1, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 1, 1, 1, 0], // 1
+            [0, 1, 1, 1, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 1, 1, 1, 1], // 2
+            [1, 1, 1, 1, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 1, 0, 1, 1, 1, 0], // 3
+            [0, 0, 0, 1, 0, 0, 0, 1, 1, 0, 0, 1, 0, 1, 0, 1, 0, 0, 1, 0, 1, 1, 1, 1, 1, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0], // 4
+            [1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 1, 0, 0, 0, 1, 0, 1, 1, 1, 0], // 5
+            [0, 0, 1, 1, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 1, 1, 1, 1, 0, 1, 0, 0, 0, 1, 1, 0, 0, 0, 1, 0, 1, 1, 1, 0], // 6
+            [1, 1, 1, 1, 1, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0], // 7
+            [0, 1, 1, 1, 0, 1, 0, 0, 0, 1, 1, 0, 0, 0, 1, 0, 1, 1, 1, 0, 1, 0, 0, 0, 1, 1, 0, 0, 0, 1, 0, 1, 1, 1, 0], // 8
+            [0, 1, 1, 1, 0, 1, 0, 0, 0, 1, 1, 0, 0, 0, 1, 0, 1, 1, 1, 1, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 1, 1, 0, 0]  // 9
+        ];
+
+        const colonPattern = [
+            0, 0, 0, 0, 0,
+            0, 0, 1, 0, 0,
+            0, 0, 1, 0, 0,
+            0, 0, 0, 0, 0,
+            0, 0, 1, 0, 0,
+            0, 0, 1, 0, 0,
+            0, 0, 0, 0, 0
+        ];
+
+        let circles = [];
+
+        class Circle {
+            constructor(x, y) {
+                this.x = x;
+                this.y = y;
+                this.targetX = x;
+                this.targetY = y;
+                this.isActive = false;
+            }
+
+            draw() {
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, CIRCLE_RADIUS, 0, Math.PI * 2);
+                ctx.fillStyle = this.isActive ? "red" : "transparent"; // Use transparent for inactive
+                ctx.fill();
+            }
+
+            moveTowardsTarget() {
+                this.x += (this.targetX - this.x) * TRANSITION_SPEED;
+                this.y += (this.targetY - this.y) * TRANSITION_SPEED;
+            }
+
+            setTarget(x, y) {
+                this.targetX = x;
+                this.targetY = y;
+            }
+
+            activate() {
+                this.isActive = true;
+            }
+
+            deactivate() {
+                this.isActive = false;
+                this.setTarget(Math.random() * canvas.width, Math.random() * canvas.height);
+            }
+        }
+
+        const updateCircles = (targetPositions) => {
+            circles.forEach((circle, i) => {
+                if (i < targetPositions.length) {
+                    const { x, y } = targetPositions[i];
+                    circle.setTarget(x, y);
+                    circle.activate();
+                } else {
+                    circle.deactivate();
+                }
+            });
+        };
+
+        const createCircles = (num) => {
+            circles = Array.from({ length: num }, () => 
+                new Circle(Math.random() * canvas.width, Math.random() * canvas.height)
+            );
+        };
+
+        const drawDigit = (x, y, pattern, cols, rows) => {
+            const targetPositions = [];
+            for (let row = 0; row < rows; row++) {
+                for (let col = 0; col < cols; col++) {
+                    if (pattern[row * cols + col] === 1) {
+                        targetPositions.push({ x: x + col * CIRCLE_SPACING, y: y + row * CIRCLE_SPACING });
+                    }
+                }
+            }
+            return targetPositions;
+        };
+
+        const drawClock = () => {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            const now = new Date();
+            const timeString = [
+                String(now.getHours()).padStart(2, "0"),
+                String(now.getMinutes()).padStart(2, "0"),
+                String(now.getSeconds()).padStart(2, "0")
+            ].join(":");
+
+            let xOffset = (canvas.width - (timeString.length * 6 * CIRCLE_SPACING)) / 2;
+            const yOffset = canvas.height / 2 - CIRCLE_SPACING * 4;
+
+            let targetPositions = [];
+            for (const char of timeString) {
+                if (char === ":") {
+                    targetPositions = targetPositions.concat(drawDigit(xOffset, yOffset, colonPattern, 5, 7));
+                } else {
+                    const digit = parseInt(char);
+                    targetPositions = targetPositions.concat(drawDigit(xOffset, yOffset, digitPatterns[digit], 5, 8));
+                }
+                xOffset += 6 * CIRCLE_SPACING; // Spacing between digits/colons
+            }
+
+            updateCircles(targetPositions);
+
+            circles.forEach(circle => {
+                circle.moveTowardsTarget();
+                circle.draw();
+            });
+
+            requestAnimationFrame(drawClock);
+        };
+
+        createCircles(150);
+        drawClock();
+    </script>
+</body>
+</html>
